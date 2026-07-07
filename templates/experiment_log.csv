@@ -1,0 +1,2 @@
+date,operator,phase,test_id,vehicle_mass_g,payload_mass_g,battery_voltage_start_v,battery_voltage_end_v,offset_x_cm,offset_y_cm,yaw_error_deg,target_visible,range_valid,contact,seated,lock_switch_closed,hall_locked,state_result,abort_reason,collision,stuck,brownout,video_file,log_file,notes
+,,,,,,,,,,,,,,,,,,,,,,,,

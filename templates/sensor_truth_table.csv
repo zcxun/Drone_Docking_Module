@@ -1,0 +1,7 @@
+case_id,case_name,contact,seated,lock_switch_closed,hall_locked,expected_state,expected_locked,actual_state,actual_locked,pass_fail,notes
+1,not_contacted,false,false,false,false,MANUAL_OR_SEARCH,false,,,,
+2,contact_not_seated,true,false,false,false,MECHANICAL_GUIDE,false,,,,
+3,seated_not_locked,true,true,false,false,LOCKING_OR_LOCK_VERIFY,false,,,,
+4,lock_switch_only,true,true,true,false,ABORT,false,,,,
+5,hall_only,true,true,false,true,ABORT,false,,,,
+6,dual_lock_confirmed,true,true,true,true,LIFT_TEST_OR_COMPLETE,true,,,,
