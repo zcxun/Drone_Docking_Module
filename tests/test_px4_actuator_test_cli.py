@@ -33,8 +33,11 @@ class Px4ActuatorTestCliTest(unittest.TestCase):
 
     def test_run_px4_actuator_test_sends_motor_function_command(self):
         connection = FakeConnection(
-            heartbeat=FakeHeartbeat(vehicle_type=FakeMavlink.MAV_TYPE_QUADROTOR),
-            recv_messages=[FakeCommandAck(FakeMavlink.MAV_CMD_ACTUATOR_TEST, FakeMavlink.MAV_RESULT_ACCEPTED)],
+            recv_messages=[
+                FakeHeartbeat(vehicle_type=FakeMavlink.MAV_TYPE_GCS, system=255, component=190),
+                FakeHeartbeat(vehicle_type=FakeMavlink.MAV_TYPE_QUADROTOR),
+                FakeCommandAck(FakeMavlink.MAV_CMD_ACTUATOR_TEST, FakeMavlink.MAV_RESULT_ACCEPTED),
+            ],
         )
         link = TestLink(connection)
 
@@ -48,10 +51,10 @@ class Px4ActuatorTestCliTest(unittest.TestCase):
 
     def test_run_px4_actuator_test_refuses_armed_vehicle(self):
         connection = FakeConnection(
-            heartbeat=FakeHeartbeat(
+            recv_messages=[FakeHeartbeat(
                 vehicle_type=FakeMavlink.MAV_TYPE_QUADROTOR,
                 base_mode=MAV_MODE_FLAG_SAFETY_ARMED,
-            )
+            )]
         )
         link = TestLink(connection)
 
@@ -74,6 +77,9 @@ class TestLink:
     def wait_heartbeat(self, timeout_s=5.0):
         return self._link.wait_heartbeat(timeout_s=timeout_s)
 
+    def wait_vehicle_heartbeat(self, timeout_s=5.0):
+        return self._link.wait_vehicle_heartbeat(timeout_s=timeout_s)
+
     def send_command_long(self, *args, **kwargs):
         return self._link.send_command_long(*args, **kwargs)
 
@@ -83,4 +89,3 @@ class TestLink:
 
 if __name__ == "__main__":
     unittest.main()
-

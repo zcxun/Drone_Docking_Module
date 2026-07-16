@@ -33,6 +33,20 @@ class MavlinkLinkTest(unittest.TestCase):
 
         self.assertTrue(status.armed)
 
+    def test_wait_vehicle_heartbeat_skips_gcs_heartbeat(self):
+        connection = FakeConnection(
+            recv_messages=[
+                FakeHeartbeat(vehicle_type=FakeMavlink.MAV_TYPE_GCS, system=255, component=190),
+                FakeHeartbeat(vehicle_type=FakeMavlink.MAV_TYPE_QUADROTOR, system=1, component=1),
+            ]
+        )
+        link = MavlinkLink(connection, mavlink_module=FakeMavlink)
+
+        status = link.wait_vehicle_heartbeat(timeout_s=0.1)
+
+        self.assertEqual(status.target_system, 1)
+        self.assertTrue(status.is_copter)
+
     def test_send_command_long_uses_heartbeat_targets_and_pads_params(self):
         connection = FakeConnection(heartbeat=FakeHeartbeat(vehicle_type=FakeMavlink.MAV_TYPE_QUADROTOR))
         link = MavlinkLink(connection, mavlink_module=FakeMavlink)
@@ -72,6 +86,7 @@ class FakeEnumValue:
 class FakeMavlink:
     MAV_TYPE_QUADROTOR = 2
     MAV_TYPE_FIXED_WING = 1
+    MAV_TYPE_GCS = 6
     MAV_MODE_FLAG_SAFETY_ARMED = MAV_MODE_FLAG_SAFETY_ARMED
     MAV_RESULT_ACCEPTED = 0
     MAV_RESULT_DENIED = 14
@@ -116,17 +131,19 @@ class FakeConnection:
 
 
 class FakeHeartbeat:
-    def __init__(self, *, vehicle_type, base_mode=0, custom_mode=0):
+    def __init__(self, *, vehicle_type, base_mode=0, custom_mode=0, system=1, component=1):
         self.type = vehicle_type
         self.autopilot = 3
         self.base_mode = base_mode
         self.custom_mode = custom_mode
+        self.system = system
+        self.component = component
 
     def get_srcSystem(self):
-        return 1
+        return self.system
 
     def get_srcComponent(self):
-        return 1
+        return self.component
 
 
 class FakeCommandAck:

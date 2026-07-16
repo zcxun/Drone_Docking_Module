@@ -81,9 +81,7 @@ def run_px4_actuator_test(
     if request.dry_run:
         return None
 
-    heartbeat = link.wait_heartbeat(timeout_s=5.0)
-    if not heartbeat.is_copter:
-        raise MavlinkError(f"refusing actuator test: vehicle type {heartbeat.vehicle_type} is not rotorcraft")
+    heartbeat = link.wait_vehicle_heartbeat(timeout_s=5.0)
     if heartbeat.armed:
         raise MavlinkError("refusing actuator test: vehicle is already armed")
 
@@ -148,4 +146,3 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

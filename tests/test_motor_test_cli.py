@@ -2,7 +2,12 @@ import unittest
 from contextlib import redirect_stdout
 from io import StringIO
 
-from software.companion.jetson.mavlink_link import MAV_CMD_DO_MOTOR_TEST, MAV_MODE_FLAG_SAFETY_ARMED, MavlinkError
+from software.companion.jetson.mavlink_link import (
+    MAV_CMD_DO_MOTOR_TEST,
+    MAV_MODE_FLAG_SAFETY_ARMED,
+    MavlinkError,
+    MavlinkTimeoutError,
+)
 from software.companion.jetson.motor_test_cli import (
     CONFIRMATION_TEXT,
     MotorTestRequest,
@@ -37,9 +42,9 @@ class MotorTestCliTest(unittest.TestCase):
 
     def test_run_motor_test_sends_guarded_command(self):
         connection = FakeConnection(
-            heartbeat=FakeHeartbeat(vehicle_type=FakeMavlink.MAV_TYPE_QUADROTOR),
             recv_messages=[FakeCommandAck(MAV_CMD_DO_MOTOR_TEST, FakeMavlink.MAV_RESULT_ACCEPTED)],
         )
+        connection.recv_messages.insert(0, FakeHeartbeat(vehicle_type=FakeMavlink.MAV_TYPE_QUADROTOR))
         link = TestLink(connection)
 
         ack = run_motor_test(link, MotorTestRequest(motor=2, confirmation=CONFIRMATION_TEXT))
@@ -52,10 +57,10 @@ class MotorTestCliTest(unittest.TestCase):
 
     def test_run_motor_test_refuses_already_armed_vehicle(self):
         connection = FakeConnection(
-            heartbeat=FakeHeartbeat(
+            recv_messages=[FakeHeartbeat(
                 vehicle_type=FakeMavlink.MAV_TYPE_QUADROTOR,
                 base_mode=MAV_MODE_FLAG_SAFETY_ARMED,
-            )
+            )]
         )
         link = TestLink(connection)
 
@@ -63,16 +68,18 @@ class MotorTestCliTest(unittest.TestCase):
             run_motor_test(link, MotorTestRequest(motor=1, confirmation=CONFIRMATION_TEXT))
 
     def test_run_motor_test_refuses_non_copter_vehicle(self):
-        connection = FakeConnection(heartbeat=FakeHeartbeat(vehicle_type=FakeMavlink.MAV_TYPE_FIXED_WING))
+        connection = FakeConnection(recv_messages=[FakeHeartbeat(vehicle_type=FakeMavlink.MAV_TYPE_FIXED_WING)])
         link = TestLink(connection)
 
-        with self.assertRaises(MavlinkError):
+        with self.assertRaises(MavlinkTimeoutError):
             run_motor_test(link, MotorTestRequest(motor=1, confirmation=CONFIRMATION_TEXT))
 
     def test_run_motor_test_raises_on_rejected_ack(self):
         connection = FakeConnection(
-            heartbeat=FakeHeartbeat(vehicle_type=FakeMavlink.MAV_TYPE_QUADROTOR),
-            recv_messages=[FakeCommandAck(MAV_CMD_DO_MOTOR_TEST, FakeMavlink.MAV_RESULT_DENIED)],
+            recv_messages=[
+                FakeHeartbeat(vehicle_type=FakeMavlink.MAV_TYPE_QUADROTOR),
+                FakeCommandAck(MAV_CMD_DO_MOTOR_TEST, FakeMavlink.MAV_RESULT_DENIED),
+            ],
         )
         link = TestLink(connection)
 
@@ -94,6 +101,9 @@ class TestLink:
 
     def wait_heartbeat(self, timeout_s=5.0):
         return self._link.wait_heartbeat(timeout_s=timeout_s)
+
+    def wait_vehicle_heartbeat(self, timeout_s=5.0):
+        return self._link.wait_vehicle_heartbeat(timeout_s=timeout_s)
 
     def send_command_long(self, *args, **kwargs):
         return self._link.send_command_long(*args, **kwargs)

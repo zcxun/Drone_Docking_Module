@@ -106,6 +106,23 @@ class MavlinkLink:
         if heartbeat is None:
             raise MavlinkTimeoutError(f"no HEARTBEAT within {timeout_s:.1f}s")
 
+        return self._record_heartbeat(heartbeat)
+
+    def wait_vehicle_heartbeat(self, timeout_s: float = 5.0) -> HeartbeatStatus:
+        """Wait for a rotorcraft heartbeat, ignoring GCS/component heartbeats."""
+
+        deadline_s = time.monotonic() + timeout_s
+        while time.monotonic() < deadline_s:
+            remaining_s = max(0.0, deadline_s - time.monotonic())
+            heartbeat = self.recv_match(message_type="HEARTBEAT", timeout_s=remaining_s)
+            if heartbeat is None:
+                break
+            status = self._record_heartbeat(heartbeat)
+            if status.is_copter:
+                return status
+        raise MavlinkTimeoutError(f"no Copter/rotorcraft HEARTBEAT within {timeout_s:.1f}s")
+
+    def _record_heartbeat(self, heartbeat: Any) -> HeartbeatStatus:
         target_system = _message_source_system(heartbeat, getattr(self.connection, "target_system", None))
         target_component = _message_source_component(
             heartbeat,
