@@ -7,7 +7,8 @@
 本工具只做：
 
 - 讀取 Pixhawk `HEARTBEAT` 與基本 telemetry。
-- 發送 `MAV_CMD_DO_MOTOR_TEST`。
+- 對 ArduPilot 發送 `MAV_CMD_DO_MOTOR_TEST`。
+- 對 PX4 發送 `MAV_CMD_ACTUATOR_TEST`。
 - 等待 `COMMAND_ACK`。
 
 本工具不做：
@@ -118,7 +119,7 @@ python3 -m software.companion.jetson.motor_test_cli \
   --motor 1
 ```
 
-實際單顆馬達測試：
+如果 Pixhawk 是 ArduPilot，使用 `motor_test_cli.py` 做實際單顆馬達測試：
 
 ```bash
 python3 -m software.companion.jetson.motor_test_cli \
@@ -127,6 +128,28 @@ python3 -m software.companion.jetson.motor_test_cli \
   --motor 1 \
   --throttle-percent 10 \
   --duration-s 2 \
+  --confirm PROPS_REMOVED
+```
+
+如果 Pixhawk 是 PX4，`MAV_CMD_DO_MOTOR_TEST` 可能會回 `MAV_RESULT_UNSUPPORTED`。這時改用 PX4 actuator test：
+
+```bash
+python3 -m software.companion.jetson.px4_actuator_test_cli \
+  --dry-run \
+  --device /dev/ttyTHS1 \
+  --baud 57600 \
+  --motor 1
+```
+
+PX4 實際單顆馬達測試：
+
+```bash
+python3 -m software.companion.jetson.px4_actuator_test_cli \
+  --device /dev/ttyTHS1 \
+  --baud 57600 \
+  --motor 1 \
+  --value 0.10 \
+  --timeout-s 2 \
   --confirm PROPS_REMOVED
 ```
 
@@ -139,6 +162,7 @@ python3 -m software.companion.jetson.motor_test_cli \
 - 沒有 `--confirm PROPS_REMOVED` 不會送命令。
 - 如果 Pixhawk 回報已 armed，工具會拒絕測試。
 - 如果 `COMMAND_ACK` rejected 或 timeout，工具會停止並報錯。
+- PX4 actuator test 的 `--value` 是 normalized output value，預設 `0.10`，硬性上限 `0.15`。
 
 建議順序：
 
@@ -170,4 +194,4 @@ python3 -m software.companion.jetson.motor_test_cli --motor 4 --confirm PROPS_RE
 - MAVLink Command Protocol: https://mavlink.io/en/services/command.html
 - ArduPilot motor test 拆槳要求: https://ardupilot.org/copter/docs/connect-escs-and-motors.html#checking-the-motor-numbering-with-the-mission-planner-motor-test
 - MAVLink common.xml `MAV_CMD_DO_MOTOR_TEST`: https://github.com/mavlink/mavlink/blob/master/message_definitions/v1.0/common.xml
-
+- MAVLink `MAV_CMD_ACTUATOR_TEST`: https://mavlink.io/en/messages/common.html#MAV_CMD_ACTUATOR_TEST

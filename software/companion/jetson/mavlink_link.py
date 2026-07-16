@@ -14,9 +14,11 @@ DEFAULT_SOURCE_COMPONENT = 191
 DEFAULT_TARGET_COMPONENT = 1
 
 MAV_CMD_DO_MOTOR_TEST = 2093
+MAV_CMD_ACTUATOR_TEST = 310
 MAV_CMD_SET_MESSAGE_INTERVAL = 511
 MOTOR_TEST_THROTTLE_PERCENT = 0
 MOTOR_TEST_ORDER_DEFAULT = 0
+ACTUATOR_OUTPUT_FUNCTION_MOTOR1 = 1
 MAV_RESULT_ACCEPTED = 0
 MAV_MODE_FLAG_SAFETY_ARMED = 128
 
@@ -241,4 +243,3 @@ def _seven_params(params: Iterable[float]) -> list[float]:
     if len(values) > 7:
         raise ValueError("COMMAND_LONG supports at most 7 params")
     return values + [0.0] * (7 - len(values))
-
