@@ -103,6 +103,51 @@ class DockingStateMachineTest(unittest.TestCase):
         self.assertEqual(command.state, DockingState.ABORT)
         self.assertEqual(command.abort_reason, AbortReason.UNSAFE_ATTITUDE)
 
+    def test_invalid_range_aborts_during_yaw_alignment(self):
+        machine = DockingStateMachine()
+        machine.update(SensorSnapshot(time_s=0.0, auto_enabled=True))
+        machine.update(
+            SensorSnapshot(
+                time_s=0.1,
+                auto_enabled=True,
+                target_visible=True,
+                target_offset_x_m=0.01,
+                target_offset_y_m=0.0,
+                yaw_error_deg=8.0,
+                range_m=0.5,
+                range_valid=True,
+            )
+        )
+        yaw_command = machine.update(
+            SensorSnapshot(
+                time_s=0.2,
+                auto_enabled=True,
+                target_visible=True,
+                target_offset_x_m=0.01,
+                target_offset_y_m=0.0,
+                yaw_error_deg=8.0,
+                range_m=0.5,
+                range_valid=True,
+            )
+        )
+        self.assertEqual(yaw_command.state, DockingState.YAW_ALIGN)
+
+        command = machine.update(
+            SensorSnapshot(
+                time_s=0.3,
+                auto_enabled=True,
+                target_visible=True,
+                target_offset_x_m=0.01,
+                target_offset_y_m=0.0,
+                yaw_error_deg=2.0,
+                range_m=None,
+                range_valid=False,
+            )
+        )
+
+        self.assertEqual(command.state, DockingState.ABORT)
+        self.assertEqual(command.abort_reason, AbortReason.RANGE_INVALID)
+
     def test_contact_with_large_offset_aborts(self):
         machine = DockingStateMachine()
         machine.update(SensorSnapshot(time_s=0.0, auto_enabled=True))

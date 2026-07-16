@@ -166,7 +166,9 @@ class DockingStateMachine:
                 self._enter(DockingState.YAW_ALIGN, snapshot.time_s)
 
         elif self.state == DockingState.YAW_ALIGN:
-            if self._yaw_error(snapshot) <= self.config.max_yaw_error_deg:
+            if not snapshot.range_valid:
+                self._abort(AbortReason.RANGE_INVALID, snapshot.time_s)
+            elif self._yaw_error(snapshot) <= self.config.max_yaw_error_deg:
                 self._enter(DockingState.DESCEND, snapshot.time_s)
 
         elif self.state == DockingState.DESCEND:

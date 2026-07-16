@@ -1,0 +1,2 @@
+date,operator,phone_model,laptop_model,input_mode,camera_index,video_file,tag_family,tag_id,tag_size_mm,calibration_file,frame_index,timestamp_s,target_visible,pose_valid,range_valid,status,target_offset_x_m,target_offset_y_m,yaw_error_deg,range_m,latency_ms,ground_truth_x_cm,ground_truth_y_cm,ground_truth_range_cm,ground_truth_yaw_deg,lighting_condition,occlusion_percent,pass_fail,notes
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,

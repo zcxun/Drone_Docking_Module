@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Camera Calibration</title>
+  <style>
+    :root {
+      --ink: #111111;
+      --paper: #f5f6f0;
+      --panel: rgba(255, 255, 255, 0.92);
+      --line: #d8dbd1;
+      --accent: #e4512f;
+      --green: #087f6b;
+      --warn: #c7931c;
+      --bad: #b3261e;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: "Avenir Next", "Trebuchet MS", Verdana, sans-serif;
+      overscroll-behavior: none;
+    }
+
+    body {
+      min-height: 100svh;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .stage {
+      position: relative;
+      flex: 1 1 58dvh;
+      min-height: 48dvh;
+      overflow: hidden;
+      background: #111111;
+    }
+
+    video, canvas.overlay {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .hud {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      gap: 10px;
+      padding: calc(env(safe-area-inset-top) + 10px) 10px 10px;
+      pointer-events: none;
+    }
+
+    .pill {
+      justify-self: start;
+      border-radius: 999px;
+      padding: 7px 11px;
+      color: #ffffff;
+      background: var(--ink);
+      font-weight: 800;
+      font-size: 12px;
+    }
+
+    .pill.good { background: var(--green); }
+    .pill.warn { background: var(--warn); color: var(--ink); }
+    .pill.bad { background: var(--bad); }
+
+    .panel {
+      z-index: 3;
+      display: grid;
+      flex: 0 0 auto;
+      gap: 10px;
+      max-height: min(42dvh, 330px);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 12px 12px calc(env(safe-area-inset-bottom) + 12px);
+      background: var(--panel);
+      border-top: 1px solid var(--line);
+      backdrop-filter: blur(16px);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.1;
+    }
+
+    .steps {
+      margin: 0;
+      padding-left: 18px;
+      color: #4f514c;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 7px;
+    }
+
+    .stat {
+      min-height: 54px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px;
+      background: #ffffff;
+    }
+
+    .stat span {
+      display: block;
+      color: #6b6d67;
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .stat strong {
+      display: block;
+      margin-top: 5px;
+      font-size: clamp(15px, 4.5vw, 18px);
+      font-weight: 900;
+      line-height: 1.05;
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    button, a.button {
+      min-height: 44px;
+      border: 0;
+      border-radius: 8px;
+      padding: 0 10px;
+      background: var(--ink);
+      color: #ffffff;
+      font: inherit;
+      font-weight: 900;
+      font-size: 14px;
+      text-decoration: none;
+      display: grid;
+      place-items: center;
+      text-align: center;
+    }
+
+    button.secondary, a.secondary {
+      color: var(--ink);
+      background: #ffffff;
+      border: 1px solid var(--line);
+    }
+
+    button:disabled {
+      opacity: 0.45;
+    }
+
+    @supports not (height: 100dvh) {
+      body { height: 100vh; }
+    }
+
+    @media (max-height: 680px) {
+      .stage { min-height: 52dvh; }
+      .panel { max-height: 38dvh; }
+      .steps { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="stage">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="overlay" class="overlay"></canvas>
+    <div class="hud">
+      <div id="statusPill" class="pill warn">Starting camera</div>
+    </div>
+  </main>
+
+  <section class="panel">
+    <h1>Camera Calibration</h1>
+    <ol class="steps">
+      <li>Print page 1 at 100% actual size.</li>
+      <li>Fill the view with the checkerboard from different angles.</li>
+      <li>Capture at least 15 valid samples, then solve.</li>
+    </ol>
+    <div class="stats">
+      <div class="stat"><span>Samples</span><strong id="sampleCount">0 / 15</strong></div>
+      <div class="stat"><span>Last frame</span><strong id="lastStatus">--</strong></div>
+      <div class="stat"><span>Error</span><strong id="errorValue">--</strong></div>
+    </div>
+    <div class="actions">
+      <button id="captureButton" type="button">Capture Sample</button>
+      <button id="solveButton" type="button" class="secondary">Solve</button>
+      <button id="resetButton" type="button" class="secondary">Reset</button>
+      <a class="button secondary" href="/phone">Open Tracking</a>
+    </div>
+  </section>
+
+  <canvas id="captureCanvas" hidden></canvas>
+
+  <script>
+    const video = document.getElementById("video");
+    const overlay = document.getElementById("overlay");
+    const captureCanvas = document.getElementById("captureCanvas");
+    const statusPill = document.getElementById("statusPill");
+    const sampleCount = document.getElementById("sampleCount");
+    const lastStatus = document.getElementById("lastStatus");
+    const errorValue = document.getElementById("errorValue");
+    const captureButton = document.getElementById("captureButton");
+    const solveButton = document.getElementById("solveButton");
+    const resetButton = document.getElementById("resetButton");
+    let stream = null;
+    let lastCorners = [];
+
+    async function startCamera() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false
+        });
+        video.srcObject = stream;
+        status("Aim at checkerboard", "warn");
+      } catch (error) {
+        status("Camera blocked", "bad");
+        lastStatus.textContent = error.name || "ERROR";
+      }
+    }
+
+    function status(text, kind) {
+      statusPill.textContent = text;
+      statusPill.className = `pill ${kind || ""}`;
+    }
+
+    function displayedVideoRect() {
+      const rect = video.getBoundingClientRect();
+      if (video.videoWidth === 0 || video.videoHeight === 0) {
+        return { left: 0, top: 0, width: rect.width, height: rect.height };
+      }
+      const videoAspect = video.videoWidth / video.videoHeight;
+      const boxAspect = rect.width / rect.height;
+      if (boxAspect > videoAspect) {
+        const height = rect.height;
+        const width = height * videoAspect;
+        return { left: (rect.width - width) / 2, top: 0, width, height };
+      }
+      const width = rect.width;
+      const height = width / videoAspect;
+      return { left: 0, top: (rect.height - height) / 2, width, height };
+    }
+
+    function updateOverlay(corners) {
+      lastCorners = corners || [];
+      const rect = overlay.getBoundingClientRect();
+      const ratio = window.devicePixelRatio || 1;
+      overlay.width = Math.round(rect.width * ratio);
+      overlay.height = Math.round(rect.height * ratio);
+      const ctx = overlay.getContext("2d");
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      ctx.clearRect(0, 0, rect.width, rect.height);
+      if (!lastCorners || lastCorners.length === 0 || video.videoWidth === 0) return;
+      const display = displayedVideoRect();
+      const scaleX = display.width / video.videoWidth;
+      const scaleY = display.height / video.videoHeight;
+      ctx.fillStyle = "#e4512f";
+      for (const point of lastCorners) {
+        ctx.beginPath();
+        ctx.arc(display.left + point[0] * scaleX, display.top + point[1] * scaleY, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    async function frameBlob() {
+      captureCanvas.width = video.videoWidth;
+      captureCanvas.height = video.videoHeight;
+      captureCanvas.getContext("2d").drawImage(video, 0, 0);
+      return new Promise((resolve) => captureCanvas.toBlob(resolve, "image/jpeg", 0.78));
+    }
+
+    async function captureSample() {
+      captureButton.disabled = true;
+      const blob = await frameBlob();
+      const response = await fetch("/api/calibration/sample", { method: "POST", headers: { "Content-Type": "image/jpeg" }, body: blob });
+      const result = await response.json();
+      sampleCount.textContent = `${result.sample_count || 0} / 15`;
+      lastStatus.textContent = result.status || "--";
+      updateOverlay(result.corners_px);
+      status(result.accepted ? "Sample accepted" : "Move checkerboard", result.accepted ? "good" : "warn");
+      captureButton.disabled = false;
+    }
+
+    async function solveCalibration() {
+      solveButton.disabled = true;
+      const response = await fetch("/api/calibration/solve", { method: "POST" });
+      const result = await response.json();
+      sampleCount.textContent = `${result.sample_count || 0} / 15`;
+      errorValue.textContent = result.reprojection_error_px === undefined ? "--" : `${result.reprojection_error_px.toFixed(2)} px`;
+      lastStatus.textContent = result.status || "--";
+      status(result.ok ? "Calibration saved" : "Need more samples", result.ok ? "good" : "warn");
+      solveButton.disabled = false;
+    }
+
+    async function resetCalibration() {
+      await fetch("/api/calibration/reset", { method: "POST" });
+      sampleCount.textContent = "0 / 15";
+      lastStatus.textContent = "RESET";
+      errorValue.textContent = "--";
+      updateOverlay([]);
+      status("Aim at checkerboard", "warn");
+    }
+
+    captureButton.addEventListener("click", captureSample);
+    solveButton.addEventListener("click", solveCalibration);
+    resetButton.addEventListener("click", resetCalibration);
+    video.addEventListener("loadedmetadata", () => updateOverlay(lastCorners));
+    window.addEventListener("resize", () => updateOverlay(lastCorners));
+    startCamera();
+  </script>
+</body>
+</html>

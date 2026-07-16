@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>A4 AprilTag Tracking</title>
+  <style>
+    :root {
+      --ink: #111111;
+      --paper: #f5f6f0;
+      --panel: rgba(255, 255, 255, 0.9);
+      --line: #d8dbd1;
+      --red: #e4512f;
+      --green: #00a676;
+      --warn: #c7931c;
+      --bad: #b3261e;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      color: var(--ink);
+      background: #111111;
+      font-family: "Avenir Next", "Trebuchet MS", Verdana, sans-serif;
+      overflow: hidden;
+      overscroll-behavior: none;
+    }
+
+    body {
+      min-height: 100svh;
+      height: 100dvh;
+    }
+
+    .stage {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+      background: #111111;
+    }
+
+    video, canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .hud {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      min-height: 100svh;
+      height: 100dvh;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    .top {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding: calc(env(safe-area-inset-top) + 12px) 12px 8px;
+    }
+
+    .pill {
+      border-radius: 999px;
+      padding: 8px 11px;
+      color: #ffffff;
+      background: var(--ink);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .pill.good { background: var(--green); }
+    .pill.warn { background: var(--warn); color: var(--ink); }
+    .pill.bad { background: var(--bad); }
+
+    .bottom {
+      display: grid;
+      gap: 10px;
+      max-height: 38dvh;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 10px 12px calc(env(safe-area-inset-bottom) + 12px);
+      background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.65));
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .metric {
+      min-height: 72px;
+      padding: 10px;
+      border-radius: 8px;
+      background: var(--panel);
+      backdrop-filter: blur(14px);
+    }
+
+    .metric span {
+      display: block;
+      color: #5c5f58;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .metric strong {
+      display: block;
+      margin-top: 7px;
+      font-size: clamp(15px, 4.5vw, 20px);
+      line-height: 1;
+      font-weight: 900;
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    button, a.button {
+      min-height: 46px;
+      border: 0;
+      border-radius: 8px;
+      padding: 0 12px;
+      color: #ffffff;
+      background: var(--ink);
+      font: inherit;
+      font-weight: 900;
+      text-decoration: none;
+      display: grid;
+      place-items: center;
+      text-align: center;
+    }
+
+    a.secondary {
+      color: var(--ink);
+      background: #ffffff;
+    }
+
+    @supports not (height: 100dvh) {
+      body, .hud { height: 100vh; }
+    }
+
+    @media (max-width: 380px), (max-height: 680px) {
+      .top { padding-top: calc(env(safe-area-inset-top) + 8px); }
+      .pill { padding: 7px 9px; font-size: 11px; }
+      .bottom { max-height: 42dvh; gap: 8px; }
+      .metric { min-height: 58px; padding: 8px; }
+      .metric strong { margin-top: 5px; }
+      button, a.button { min-height: 42px; font-size: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="stage">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="overlay"></canvas>
+  </main>
+  <section class="hud">
+    <div class="top">
+      <span id="statusPill" class="pill warn">Starting camera</span>
+      <span id="tagPill" class="pill">0 tags</span>
+      <span id="calPill" class="pill warn">Calibration required</span>
+    </div>
+    <div></div>
+    <div class="bottom">
+      <div class="metrics">
+        <div class="metric"><span>Height</span><strong id="heightValue">--</strong></div>
+        <div class="metric"><span>Center offset</span><strong id="offsetValue">--</strong></div>
+        <div class="metric"><span>Correction</span><strong id="hintValue">--</strong></div>
+      </div>
+      <div class="actions">
+        <button id="pauseButton" type="button">Pause</button>
+        <a class="button secondary" href="/calibration">Calibration</a>
+      </div>
+    </div>
+  </section>
+  <canvas id="captureCanvas" hidden></canvas>
+
+  <script>
+    const video = document.getElementById("video");
+    const overlay = document.getElementById("overlay");
+    const captureCanvas = document.getElementById("captureCanvas");
+    const statusPill = document.getElementById("statusPill");
+    const tagPill = document.getElementById("tagPill");
+    const calPill = document.getElementById("calPill");
+    const heightValue = document.getElementById("heightValue");
+    const offsetValue = document.getElementById("offsetValue");
+    const hintValue = document.getElementById("hintValue");
+    const pauseButton = document.getElementById("pauseButton");
+    let running = true;
+    let busy = false;
+
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false
+        });
+        video.srcObject = stream;
+        setStatus("Searching", "warn");
+        window.setInterval(sendFrame, 200);
+      } catch (error) {
+        setStatus("Camera blocked", "bad");
+      }
+    }
+
+    function setStatus(text, kind) {
+      statusPill.textContent = text;
+      statusPill.className = `pill ${kind || ""}`;
+    }
+
+    function setPill(element, text, kind) {
+      element.textContent = text;
+      element.className = `pill ${kind || ""}`;
+    }
+
+    function displayedVideoRect(imageWidth, imageHeight) {
+      const rect = overlay.getBoundingClientRect();
+      const sourceWidth = imageWidth || video.videoWidth || rect.width;
+      const sourceHeight = imageHeight || video.videoHeight || rect.height;
+      const videoAspect = sourceWidth / sourceHeight;
+      const boxAspect = rect.width / rect.height;
+      if (boxAspect > videoAspect) {
+        const height = rect.height;
+        const width = height * videoAspect;
+        return { left: (rect.width - width) / 2, top: 0, width, height, sourceWidth, sourceHeight };
+      }
+      const width = rect.width;
+      const height = width / videoAspect;
+      return { left: 0, top: (rect.height - height) / 2, width, height, sourceWidth, sourceHeight };
+    }
+
+    function mapPoint(point, display) {
+      return [
+        display.left + point[0] * display.width / display.sourceWidth,
+        display.top + point[1] * display.height / display.sourceHeight
+      ];
+    }
+
+    async function sendFrame() {
+      if (!running || busy || video.videoWidth === 0) return;
+      busy = true;
+      try {
+        captureCanvas.width = video.videoWidth;
+        captureCanvas.height = video.videoHeight;
+        captureCanvas.getContext("2d").drawImage(video, 0, 0);
+        const blob = await new Promise((resolve) => captureCanvas.toBlob(resolve, "image/jpeg", 0.72));
+        const response = await fetch("/api/board/frame", { method: "POST", headers: { "Content-Type": "image/jpeg" }, body: blob });
+        const result = await response.json();
+        render(result);
+      } catch (error) {
+        setStatus("Server error", "bad");
+      } finally {
+        busy = false;
+      }
+    }
+
+    function render(result) {
+      const rect = overlay.getBoundingClientRect();
+      const ratio = window.devicePixelRatio || 1;
+      overlay.width = Math.round(rect.width * ratio);
+      overlay.height = Math.round(rect.height * ratio);
+      const ctx = overlay.getContext("2d");
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      ctx.clearRect(0, 0, rect.width, rect.height);
+      const display = displayedVideoRect(result.image_size?.width_px, result.image_size?.height_px);
+
+      const center = result.board_center_px;
+      if (center) {
+        const [cx, cy] = mapPoint(center, display);
+        ctx.fillStyle = "#e4512f";
+        ctx.beginPath();
+        ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+        ctx.fill();
+
+        for (const tag of result.visible_tags || []) {
+          const [tx, ty] = mapPoint(tag.center_px, display);
+          ctx.strokeStyle = "#00a676";
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(cx, cy);
+          ctx.lineTo(tx, ty);
+          ctx.stroke();
+          ctx.fillStyle = "#00a676";
+          ctx.beginPath();
+          ctx.arc(tx, ty, 5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "rgba(0,0,0,0.72)";
+          ctx.fillRect((cx + tx) / 2 - 38, (cy + ty) / 2 - 16, 76, 24);
+          ctx.fillStyle = "#ffffff";
+          ctx.font = "700 13px Avenir Next, sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText(`${(tag.distance_to_center_m * 100).toFixed(1)} cm`, (cx + tx) / 2, (cy + ty) / 2 + 4);
+        }
+      }
+
+      const tagCount = result.visible_tag_ids ? result.visible_tag_ids.length : 0;
+      setPill(tagPill, `${tagCount} tags`, tagCount >= 4 ? "good" : tagCount >= 2 ? "warn" : "bad");
+      setPill(calPill, result.calibrated ? "Calibrated" : "Calibration required", result.calibrated ? "good" : "warn");
+      setStatus(result.status || "UNKNOWN", result.status === "OK" ? "good" : result.status === "SEARCHING" ? "bad" : "warn");
+      heightValue.textContent = result.height_valid ? `${(result.height_m * 100).toFixed(1)} cm` : "--";
+      if (result.offset_px) {
+        offsetValue.textContent = `${result.offset_px.x.toFixed(0)}, ${result.offset_px.y.toFixed(0)} px`;
+      } else {
+        offsetValue.textContent = "--";
+      }
+      if (result.correction_hint) {
+        hintValue.textContent = `${result.correction_hint.x} / ${result.correction_hint.y}`;
+      } else {
+        hintValue.textContent = "--";
+      }
+    }
+
+    pauseButton.addEventListener("click", () => {
+      running = !running;
+      pauseButton.textContent = running ? "Pause" : "Resume";
+    });
+
+    startCamera();
+  </script>
+</body>
+</html>

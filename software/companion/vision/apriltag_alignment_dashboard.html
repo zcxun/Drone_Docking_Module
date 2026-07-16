@@ -1,0 +1,1230 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AprilTag Alignment Console</title>
+  <style>
+    :root {
+      --ink: #171717;
+      --muted: #656565;
+      --paper: #f4f5f1;
+      --panel: #ffffff;
+      --line: #d8dad1;
+      --grid: #e6e8de;
+      --accent: #e4512f;
+      --teal: #087f6b;
+      --mustard: #c7931c;
+      --violet: #6154a6;
+      --bad: #b3261e;
+      --shadow: 0 18px 60px rgba(23, 23, 23, 0.10);
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      min-height: 100%;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: "Avenir Next", "Trebuchet MS", Verdana, sans-serif;
+      letter-spacing: 0;
+    }
+
+    body {
+      min-height: 100%;
+      margin: 0;
+      background:
+        linear-gradient(90deg, rgba(23, 23, 23, 0.035) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(23, 23, 23, 0.035) 1px, transparent 1px),
+        var(--paper);
+      background-size: 48px 48px;
+      letter-spacing: 0;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+      letter-spacing: 0;
+    }
+
+    button:focus-visible,
+    input:focus-visible {
+      outline: 3px solid rgba(228, 81, 47, 0.35);
+      outline-offset: 2px;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) auto;
+      align-items: center;
+      gap: 18px;
+      padding: 18px clamp(16px, 4vw, 42px);
+      border-bottom: 1px solid var(--line);
+      background: rgba(244, 245, 241, 0.92);
+      backdrop-filter: blur(14px);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: clamp(22px, 3vw, 38px);
+      line-height: 1;
+      font-weight: 800;
+    }
+
+    .brand span {
+      color: var(--muted);
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    .sourcebar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .segmented {
+      display: inline-grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      padding: 3px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      box-shadow: 0 5px 20px rgba(23, 23, 23, 0.06);
+    }
+
+    .segmented button,
+    .tool-button {
+      min-height: 36px;
+      border: 0;
+      border-radius: 6px;
+      padding: 0 13px;
+      color: var(--ink);
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .segmented button[aria-pressed="true"] {
+      color: #ffffff;
+      background: var(--ink);
+    }
+
+    .tool-button {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      box-shadow: 0 5px 20px rgba(23, 23, 23, 0.06);
+    }
+
+    .file-input {
+      width: 230px;
+      max-width: 100%;
+      color: var(--muted);
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: var(--radius);
+      padding: 7px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(320px, 1.4fr) minmax(280px, 0.8fr);
+      gap: 16px;
+      padding: 16px clamp(16px, 4vw, 42px) 42px;
+    }
+
+    .panel {
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      min-width: 0;
+    }
+
+    .alignment-panel {
+      display: grid;
+      grid-template-rows: auto minmax(360px, 1fr) auto;
+      min-height: min(760px, calc(100vh - 132px));
+    }
+
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .panel-title {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 800;
+    }
+
+    .status-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .pill {
+      min-height: 28px;
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 0 10px;
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--ink);
+      background: #eceee5;
+      border: 1px solid var(--line);
+    }
+
+    .pill.good {
+      color: #ffffff;
+      background: var(--teal);
+      border-color: var(--teal);
+    }
+
+    .pill.warn {
+      color: var(--ink);
+      background: #f3d37d;
+      border-color: #ddb64c;
+    }
+
+    .pill.bad {
+      color: #ffffff;
+      background: var(--bad);
+      border-color: var(--bad);
+    }
+
+    .plot-wrap {
+      position: relative;
+      min-height: 360px;
+      padding: 12px;
+      background:
+        linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+        linear-gradient(0deg, var(--grid) 1px, transparent 1px),
+        #fbfcf7;
+      background-size: 28px 28px;
+    }
+
+    .plot {
+      width: 100%;
+      height: 100%;
+      min-height: 420px;
+      display: block;
+    }
+
+    .plot-label {
+      position: absolute;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      pointer-events: none;
+    }
+
+    .plot-label.top {
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .plot-label.right {
+      right: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    .plot-label.bottom {
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .plot-label.left {
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    .legend {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 1px;
+      border-top: 1px solid var(--line);
+      background: var(--line);
+    }
+
+    .legend-item {
+      min-height: 58px;
+      padding: 11px 13px;
+      background: var(--panel);
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      flex: 0 0 auto;
+    }
+
+    .swatch.current {
+      background: var(--accent);
+    }
+
+    .swatch.projected {
+      background: var(--teal);
+    }
+
+    .swatch.target {
+      background: var(--ink);
+    }
+
+    .swatch.limit {
+      background: var(--mustard);
+    }
+
+    .side {
+      display: grid;
+      gap: 16px;
+      align-content: start;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1px;
+      overflow: hidden;
+      background: var(--line);
+    }
+
+    .metric {
+      min-height: 92px;
+      padding: 14px;
+      background: var(--panel);
+    }
+
+    .metric label {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    .metric strong {
+      display: block;
+      font-size: clamp(22px, 4vw, 32px);
+      line-height: 1;
+      font-weight: 900;
+      overflow-wrap: anywhere;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      margin-top: 6px;
+      font-size: 12px;
+    }
+
+    .command-panel,
+    .input-panel,
+    .csv-panel {
+      padding: 16px;
+    }
+
+    .command-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+
+    .command-line {
+      display: grid;
+      grid-template-columns: 76px 1fr 82px;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .bar {
+      height: 14px;
+      border-radius: 999px;
+      background: #eceee5;
+      border: 1px solid var(--line);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .bar::before {
+      content: "";
+      position: absolute;
+      inset: 0 50%;
+      border-left: 1px solid rgba(23, 23, 23, 0.22);
+    }
+
+    .bar-fill {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      width: 0;
+      background: var(--teal);
+    }
+
+    .bar-fill.negative {
+      left: auto;
+      right: 50%;
+      background: var(--accent);
+    }
+
+    .readout {
+      text-align: right;
+      color: var(--ink);
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .yaw-dial {
+      display: grid;
+      place-items: center;
+      min-height: 170px;
+      border-top: 1px solid var(--line);
+      margin: 16px -16px -16px;
+      background:
+        radial-gradient(circle at 50% 50%, #ffffff 0 41%, transparent 42%),
+        conic-gradient(from -90deg, rgba(179, 38, 30, 0.14), rgba(199, 147, 28, 0.28), rgba(8, 127, 107, 0.18), rgba(199, 147, 28, 0.28), rgba(179, 38, 30, 0.14));
+    }
+
+    .needle {
+      width: 4px;
+      height: 72px;
+      background: var(--accent);
+      border-radius: 999px;
+      transform-origin: 50% 100%;
+      box-shadow: 0 7px 18px rgba(228, 81, 47, 0.35);
+    }
+
+    .manual-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .field label {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .field input[type="number"],
+    .field input[type="range"] {
+      width: 100%;
+    }
+
+    .field input[type="number"] {
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 6px 9px;
+      background: #fbfcf7;
+      color: var(--ink);
+    }
+
+    .toggles {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 36px;
+      padding: 6px 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fbfcf7;
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .csv-panel {
+      display: grid;
+      gap: 12px;
+    }
+
+    .csv-nav {
+      display: grid;
+      grid-template-columns: 42px 1fr 42px;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .csv-nav button {
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel);
+      cursor: pointer;
+      font-weight: 900;
+    }
+
+    .csv-nav input {
+      width: 100%;
+    }
+
+    .row-note {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+      min-height: 20px;
+    }
+
+    @media (max-width: 980px) {
+      .topbar,
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .sourcebar {
+        justify-content: flex-start;
+      }
+
+      .legend,
+      .metrics,
+      .manual-grid,
+      .toggles {
+        grid-template-columns: 1fr;
+      }
+
+      .alignment-panel {
+        min-height: auto;
+      }
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      .bar-fill,
+      .needle,
+      #currentPoint,
+      #projectedPoint,
+      #commandArrow,
+      #zeroLine {
+        transition: all 180ms ease;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <h1>AprilTag Alignment Console</h1>
+      <span>iPhone 13 rear camera to MacBook</span>
+    </div>
+    <div class="sourcebar">
+      <div class="segmented" aria-label="Data source">
+        <button id="liveModeButton" type="button" aria-pressed="false">Live</button>
+        <button id="manualModeButton" type="button" aria-pressed="true">Manual</button>
+        <button id="csvModeButton" type="button" aria-pressed="false">CSV Log</button>
+      </div>
+      <span id="liveStatusPill" class="pill bad">LIVE OFF</span>
+      <input id="csvFile" class="file-input" type="file" accept=".csv,text/csv">
+      <button id="demoButton" class="tool-button" type="button">Demo</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel alignment-panel" aria-label="Alignment plot">
+      <div class="panel-head">
+        <h2 class="panel-title">Error Plane</h2>
+        <div class="status-row">
+          <span id="visiblePill" class="pill">VISIBLE</span>
+          <span id="posePill" class="pill">POSE</span>
+          <span id="rangePill" class="pill">RANGE</span>
+          <span id="modePill" class="pill">MODE</span>
+        </div>
+      </div>
+
+      <div class="plot-wrap">
+        <span class="plot-label top">+Y</span>
+        <span class="plot-label right">+X</span>
+        <span class="plot-label bottom">-Y</span>
+        <span class="plot-label left">-X</span>
+        <svg id="plot" class="plot" viewBox="-0.15 -0.15 0.30 0.30" role="img" aria-label="Current tag offset and suggested correction">
+          <defs>
+            <marker id="arrowHead" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" fill="#087f6b"></path>
+            </marker>
+          </defs>
+          <circle id="contactRing" cx="0" cy="0" r="0.08" fill="none" stroke="#c7931c" stroke-width="0.0025" stroke-dasharray="0.01 0.006"></circle>
+          <circle id="alignRing" cx="0" cy="0" r="0.03" fill="rgba(8, 127, 107, 0.08)" stroke="#087f6b" stroke-width="0.0025"></circle>
+          <line id="axisX" x1="-0.15" y1="0" x2="0.15" y2="0" stroke="#b8bbb1" stroke-width="0.0018"></line>
+          <line id="axisY" x1="0" y1="-0.15" x2="0" y2="0.15" stroke="#b8bbb1" stroke-width="0.0018"></line>
+          <line id="zeroLine" x1="0" y1="0" x2="0" y2="0" stroke="#171717" stroke-width="0.0018" stroke-dasharray="0.006 0.005"></line>
+          <line id="commandArrow" x1="0" y1="0" x2="0" y2="0" stroke="#087f6b" stroke-width="0.004" stroke-linecap="round" marker-end="url(#arrowHead)"></line>
+          <circle id="targetPoint" cx="0" cy="0" r="0.006" fill="#171717"></circle>
+          <circle id="projectedPoint" cx="0" cy="0" r="0.007" fill="#087f6b"></circle>
+          <circle id="currentPoint" cx="0" cy="0" r="0.008" fill="#e4512f"></circle>
+        </svg>
+      </div>
+
+      <div class="legend" aria-label="Plot legend">
+        <div class="legend-item"><span class="swatch current"></span>Current error</div>
+        <div class="legend-item"><span class="swatch projected"></span>1s projected error</div>
+        <div class="legend-item"><span class="swatch target"></span>Desired center</div>
+        <div class="legend-item"><span class="swatch limit"></span>8 cm contact limit</div>
+      </div>
+    </section>
+
+    <aside class="side">
+      <section class="panel metrics" aria-label="Alignment metrics">
+        <div class="metric">
+          <label>Horizontal error</label>
+          <strong id="horizontalError">0.000 m</strong>
+          <span id="horizontalState">Inside 3 cm gate</span>
+        </div>
+        <div class="metric">
+          <label>Yaw error</label>
+          <strong id="yawError">0.0 deg</strong>
+          <span id="yawState">Inside 5 deg gate</span>
+        </div>
+        <div class="metric">
+          <label>Range</label>
+          <strong id="rangeValue">0.000 m</strong>
+          <span id="rangeState">Valid</span>
+        </div>
+        <div class="metric">
+          <label>Next state hint</label>
+          <strong id="stateHint">SEARCH</strong>
+          <span id="statusText">Waiting for tag</span>
+        </div>
+      </section>
+
+      <section class="panel command-panel" aria-label="Algorithm command">
+        <div class="panel-head" style="padding: 0 0 14px; border-bottom: 0;">
+          <h2 class="panel-title">Command Preview</h2>
+        </div>
+        <div class="command-grid">
+          <div class="command-line">
+            <span>vx</span>
+            <div class="bar"><span id="vxBar" class="bar-fill"></span></div>
+            <span id="vxValue" class="readout">0.000</span>
+          </div>
+          <div class="command-line">
+            <span>vy</span>
+            <div class="bar"><span id="vyBar" class="bar-fill"></span></div>
+            <span id="vyValue" class="readout">0.000</span>
+          </div>
+          <div class="command-line">
+            <span>yaw</span>
+            <div class="bar"><span id="yawRateBar" class="bar-fill"></span></div>
+            <span id="yawRateValue" class="readout">0.0</span>
+          </div>
+        </div>
+        <div class="yaw-dial">
+          <div id="yawNeedle" class="needle" aria-hidden="true"></div>
+        </div>
+      </section>
+
+      <section class="panel input-panel" aria-label="Manual input">
+        <div class="panel-head" style="padding: 0 0 14px; border-bottom: 0;">
+          <h2 class="panel-title">Manual Observation</h2>
+        </div>
+        <div class="manual-grid">
+          <div class="field">
+            <label for="inputX">x offset m</label>
+            <input id="inputX" type="number" step="0.005" value="0.060">
+          </div>
+          <div class="field">
+            <label for="inputY">y offset m</label>
+            <input id="inputY" type="number" step="0.005" value="-0.035">
+          </div>
+          <div class="field">
+            <label for="inputYaw">yaw error deg</label>
+            <input id="inputYaw" type="number" step="0.5" value="8.0">
+          </div>
+          <div class="field">
+            <label for="inputRange">range m</label>
+            <input id="inputRange" type="number" step="0.01" value="0.50">
+          </div>
+        </div>
+        <div class="toggles">
+          <label class="toggle"><input id="inputVisible" type="checkbox" checked> target visible</label>
+          <label class="toggle"><input id="inputPoseValid" type="checkbox" checked> pose valid</label>
+          <label class="toggle"><input id="inputRangeValid" type="checkbox" checked> range valid</label>
+          <label class="toggle"><input id="inputCalibrated" type="checkbox"> calibrated</label>
+        </div>
+      </section>
+
+      <section class="panel csv-panel" aria-label="CSV navigation">
+        <div class="panel-head" style="padding: 0; border-bottom: 0;">
+          <h2 class="panel-title">CSV Row</h2>
+          <span id="rowCounter" class="pill">0 / 0</span>
+        </div>
+        <div class="csv-nav">
+          <button id="prevRow" type="button" aria-label="Previous row">&lt;</button>
+          <input id="rowSlider" type="range" min="0" max="0" value="0">
+          <button id="nextRow" type="button" aria-label="Next row">&gt;</button>
+        </div>
+        <div id="rowNote" class="row-note">No CSV loaded</div>
+      </section>
+    </aside>
+  </main>
+
+  <script>
+    const CONFIG = {
+      horizontalGain: 0.6,
+      yawGain: 0.5,
+      maxHorizontalSpeed: 0.20,
+      maxYawRate: 15.0,
+      alignLimit: 0.03,
+      contactLimit: 0.08,
+      previewSeconds: 1.0
+    };
+
+    const elements = {
+      liveModeButton: document.getElementById("liveModeButton"),
+      manualModeButton: document.getElementById("manualModeButton"),
+      csvModeButton: document.getElementById("csvModeButton"),
+      liveStatusPill: document.getElementById("liveStatusPill"),
+      csvFile: document.getElementById("csvFile"),
+      demoButton: document.getElementById("demoButton"),
+      plot: document.getElementById("plot"),
+      alignRing: document.getElementById("alignRing"),
+      contactRing: document.getElementById("contactRing"),
+      axisX: document.getElementById("axisX"),
+      axisY: document.getElementById("axisY"),
+      zeroLine: document.getElementById("zeroLine"),
+      commandArrow: document.getElementById("commandArrow"),
+      currentPoint: document.getElementById("currentPoint"),
+      projectedPoint: document.getElementById("projectedPoint"),
+      targetPoint: document.getElementById("targetPoint"),
+      visiblePill: document.getElementById("visiblePill"),
+      posePill: document.getElementById("posePill"),
+      rangePill: document.getElementById("rangePill"),
+      modePill: document.getElementById("modePill"),
+      horizontalError: document.getElementById("horizontalError"),
+      horizontalState: document.getElementById("horizontalState"),
+      yawError: document.getElementById("yawError"),
+      yawState: document.getElementById("yawState"),
+      rangeValue: document.getElementById("rangeValue"),
+      rangeState: document.getElementById("rangeState"),
+      stateHint: document.getElementById("stateHint"),
+      statusText: document.getElementById("statusText"),
+      vxBar: document.getElementById("vxBar"),
+      vyBar: document.getElementById("vyBar"),
+      yawRateBar: document.getElementById("yawRateBar"),
+      vxValue: document.getElementById("vxValue"),
+      vyValue: document.getElementById("vyValue"),
+      yawRateValue: document.getElementById("yawRateValue"),
+      yawNeedle: document.getElementById("yawNeedle"),
+      inputX: document.getElementById("inputX"),
+      inputY: document.getElementById("inputY"),
+      inputYaw: document.getElementById("inputYaw"),
+      inputRange: document.getElementById("inputRange"),
+      inputVisible: document.getElementById("inputVisible"),
+      inputPoseValid: document.getElementById("inputPoseValid"),
+      inputRangeValid: document.getElementById("inputRangeValid"),
+      inputCalibrated: document.getElementById("inputCalibrated"),
+      prevRow: document.getElementById("prevRow"),
+      nextRow: document.getElementById("nextRow"),
+      rowSlider: document.getElementById("rowSlider"),
+      rowCounter: document.getElementById("rowCounter"),
+      rowNote: document.getElementById("rowNote")
+    };
+
+    let mode = "manual";
+    let csvRows = [];
+    let csvIndex = 0;
+    let liveObservation = null;
+    let liveSource = null;
+    let liveConnected = false;
+    let liveError = null;
+    let lastLiveAtMs = 0;
+
+    function clamp(value, limit) {
+      if (!Number.isFinite(value)) {
+        return 0;
+      }
+      return Math.max(-limit, Math.min(limit, value));
+    }
+
+    function finiteNumber(value) {
+      const number = Number(value);
+      return Number.isFinite(number) ? number : null;
+    }
+
+    function asBoolean(value) {
+      if (typeof value === "boolean") {
+        return value;
+      }
+      if (value === undefined || value === null) {
+        return false;
+      }
+      return String(value).trim().toLowerCase() === "true";
+    }
+
+    function observationFromManual() {
+      const poseValid = elements.inputPoseValid.checked;
+      const rangeValid = elements.inputRangeValid.checked;
+      const calibrated = elements.inputCalibrated.checked;
+      return {
+        timestamp_s: Date.now() / 1000,
+        target_visible: elements.inputVisible.checked,
+        target_offset_x_m: finiteNumber(elements.inputX.value),
+        target_offset_y_m: finiteNumber(elements.inputY.value),
+        yaw_error_deg: finiteNumber(elements.inputYaw.value),
+        range_m: finiteNumber(elements.inputRange.value),
+        range_valid: rangeValid,
+        pose_valid: poseValid,
+        calibrated: calibrated,
+        status: poseValid && rangeValid ? "OK" : "UNCALIBRATED_ESTIMATE",
+        frame_index: null
+      };
+    }
+
+    function observationFromRow(row) {
+      return {
+        timestamp_s: finiteNumber(row.timestamp_s),
+        target_visible: asBoolean(row.target_visible),
+        target_offset_x_m: finiteNumber(row.target_offset_x_m),
+        target_offset_y_m: finiteNumber(row.target_offset_y_m),
+        yaw_error_deg: finiteNumber(row.yaw_error_deg),
+        range_m: finiteNumber(row.range_m),
+        range_valid: asBoolean(row.range_valid),
+        pose_valid: asBoolean(row.pose_valid),
+        calibrated: asBoolean(row.calibrated),
+        status: row.status || "UNKNOWN",
+        frame_index: finiteNumber(row.frame_index)
+      };
+    }
+
+    function emptyLiveObservation() {
+      return {
+        timestamp_s: null,
+        target_visible: false,
+        target_offset_x_m: null,
+        target_offset_y_m: null,
+        yaw_error_deg: null,
+        range_m: null,
+        range_valid: false,
+        pose_valid: false,
+        calibrated: false,
+        status: liveError || "WAITING_FOR_LIVE_CAMERA",
+        frame_index: null
+      };
+    }
+
+    function activeObservation() {
+      if (mode === "live") {
+        return liveObservation !== null ? liveObservation : emptyLiveObservation();
+      }
+      if (mode === "csv" && csvRows.length > 0) {
+        return observationFromRow(csvRows[csvIndex]);
+      }
+      return observationFromManual();
+    }
+
+    function computeCommand(observation) {
+      const x = observation.target_offset_x_m;
+      const y = observation.target_offset_y_m;
+      const yaw = observation.yaw_error_deg;
+      const visible = observation.target_visible && Number.isFinite(x) && Number.isFinite(y);
+      const vx = visible ? clamp(-CONFIG.horizontalGain * x, CONFIG.maxHorizontalSpeed) : 0;
+      const vy = visible ? clamp(-CONFIG.horizontalGain * y, CONFIG.maxHorizontalSpeed) : 0;
+      const yawRate = observation.target_visible && Number.isFinite(yaw)
+        ? clamp(-CONFIG.yawGain * yaw, CONFIG.maxYawRate)
+        : 0;
+      return { vx, vy, yawRate };
+    }
+
+    function deriveState(observation, error, yawAbs) {
+      if (!observation.target_visible) {
+        return { state: "SEARCH", text: observation.status || "TAG_NOT_FOUND" };
+      }
+      if (!observation.pose_valid) {
+        return { state: "LOG ONLY", text: observation.status || "POSE_INVALID" };
+      }
+      if (!observation.range_valid) {
+        return { state: "HOLD", text: "Range invalid" };
+      }
+      if (error > CONFIG.alignLimit) {
+        return { state: "HORIZONTAL_ALIGN", text: "Move toward center" };
+      }
+      if (yawAbs > 5) {
+        return { state: "YAW_ALIGN", text: "Rotate toward zero yaw" };
+      }
+      return { state: "DESCEND READY", text: "Within horizontal and yaw gates" };
+    }
+
+    function update() {
+      const observation = activeObservation();
+      const command = computeCommand(observation);
+      const x = Number.isFinite(observation.target_offset_x_m) ? observation.target_offset_x_m : 0;
+      const y = Number.isFinite(observation.target_offset_y_m) ? observation.target_offset_y_m : 0;
+      const projectedX = x + command.vx * CONFIG.previewSeconds;
+      const projectedY = y + command.vy * CONFIG.previewSeconds;
+      const error = Math.hypot(x, y);
+      const yawAbs = Math.abs(Number.isFinite(observation.yaw_error_deg) ? observation.yaw_error_deg : 0);
+      const range = Number.isFinite(observation.range_m) ? observation.range_m : null;
+      const state = deriveState(observation, error, yawAbs);
+
+      updatePlot(observation, x, y, projectedX, projectedY);
+      updatePills(observation, state);
+      updateMetrics(observation, error, yawAbs, range, state);
+      updateCommand(command);
+      updateLiveStatus();
+      updateCsvControls();
+    }
+
+    function updatePlot(observation, x, y, projectedX, projectedY) {
+      const maxAbs = Math.max(
+        CONFIG.contactLimit,
+        Math.abs(x),
+        Math.abs(y),
+        Math.abs(projectedX),
+        Math.abs(projectedY),
+        0.10
+      );
+      const limit = maxAbs * 1.45;
+      const stroke = limit * 0.018;
+      elements.plot.setAttribute("viewBox", `${-limit} ${-limit} ${limit * 2} ${limit * 2}`);
+      elements.alignRing.setAttribute("r", CONFIG.alignLimit);
+      elements.contactRing.setAttribute("r", CONFIG.contactLimit);
+      elements.alignRing.setAttribute("stroke-width", stroke);
+      elements.contactRing.setAttribute("stroke-width", stroke);
+      elements.axisX.setAttribute("x1", -limit);
+      elements.axisX.setAttribute("x2", limit);
+      elements.axisY.setAttribute("y1", -limit);
+      elements.axisY.setAttribute("y2", limit);
+      elements.axisX.setAttribute("stroke-width", stroke * 0.75);
+      elements.axisY.setAttribute("stroke-width", stroke * 0.75);
+
+      const visible = observation.target_visible && Number.isFinite(observation.target_offset_x_m) && Number.isFinite(observation.target_offset_y_m);
+      const currentY = -y;
+      const projectedSvgY = -projectedY;
+      setPoint(elements.currentPoint, x, currentY, limit * 0.046, visible);
+      setPoint(elements.projectedPoint, projectedX, projectedSvgY, limit * 0.04, visible);
+      setPoint(elements.targetPoint, 0, 0, limit * 0.035, true);
+
+      elements.zeroLine.setAttribute("x1", x);
+      elements.zeroLine.setAttribute("y1", currentY);
+      elements.zeroLine.setAttribute("x2", 0);
+      elements.zeroLine.setAttribute("y2", 0);
+      elements.zeroLine.setAttribute("stroke-width", stroke * 0.8);
+      elements.zeroLine.style.opacity = visible ? "1" : "0";
+
+      elements.commandArrow.setAttribute("x1", x);
+      elements.commandArrow.setAttribute("y1", currentY);
+      elements.commandArrow.setAttribute("x2", projectedX);
+      elements.commandArrow.setAttribute("y2", projectedSvgY);
+      elements.commandArrow.setAttribute("stroke-width", stroke * 1.5);
+      elements.commandArrow.style.opacity = visible ? "1" : "0";
+    }
+
+    function setPoint(element, x, y, radius, visible) {
+      element.setAttribute("cx", x);
+      element.setAttribute("cy", y);
+      element.setAttribute("r", radius);
+      element.style.opacity = visible ? "1" : "0.12";
+    }
+
+    function updatePills(observation, state) {
+      setPill(elements.visiblePill, observation.target_visible ? "VISIBLE" : "NOT VISIBLE", observation.target_visible ? "good" : "bad");
+      setPill(elements.posePill, observation.pose_valid ? "POSE VALID" : "POSE INVALID", observation.pose_valid ? "good" : "warn");
+      setPill(elements.rangePill, observation.range_valid ? "RANGE VALID" : "RANGE INVALID", observation.range_valid ? "good" : "warn");
+      const modeClass = state.state === "DESCEND READY" ? "good" : state.state === "SEARCH" ? "bad" : "warn";
+      setPill(elements.modePill, state.state, modeClass);
+    }
+
+    function updateLiveStatus() {
+      if (liveError && lastLiveAtMs === 0) {
+        setPill(elements.liveStatusPill, "LIVE ERROR", "bad");
+      } else if (liveConnected) {
+        const ageMs = Date.now() - lastLiveAtMs;
+        const label = ageMs > 1500 ? "LIVE STALE" : "LIVE ON";
+        setPill(elements.liveStatusPill, label, ageMs > 1500 ? "warn" : "good");
+      } else if (liveError) {
+        setPill(elements.liveStatusPill, "LIVE ERROR", "bad");
+      } else {
+        setPill(elements.liveStatusPill, "LIVE OFF", "bad");
+      }
+    }
+
+    function setPill(element, text, styleName) {
+      element.textContent = text;
+      element.className = `pill ${styleName}`;
+    }
+
+    function updateMetrics(observation, error, yawAbs, range, state) {
+      elements.horizontalError.textContent = `${formatNumber(error, 3)} m`;
+      elements.horizontalState.textContent = error <= CONFIG.alignLimit ? "Inside 3 cm gate" : "Outside 3 cm gate";
+      elements.yawError.textContent = `${formatNumber(yawAbs, 1)} deg`;
+      elements.yawState.textContent = yawAbs <= 5 ? "Inside 5 deg gate" : "Outside 5 deg gate";
+      elements.rangeValue.textContent = range === null ? "None" : `${formatNumber(range, 3)} m`;
+      elements.rangeState.textContent = observation.range_valid ? "Valid" : "Not valid";
+      elements.stateHint.textContent = state.state;
+      elements.statusText.textContent = observation.status || state.text;
+    }
+
+    function updateCommand(command) {
+      setBar(elements.vxBar, command.vx, CONFIG.maxHorizontalSpeed);
+      setBar(elements.vyBar, command.vy, CONFIG.maxHorizontalSpeed);
+      setBar(elements.yawRateBar, command.yawRate, CONFIG.maxYawRate);
+      elements.vxValue.textContent = formatNumber(command.vx, 3);
+      elements.vyValue.textContent = formatNumber(command.vy, 3);
+      elements.yawRateValue.textContent = formatNumber(command.yawRate, 1);
+      elements.yawNeedle.style.transform = `rotate(${command.yawRate * 4}deg)`;
+    }
+
+    function setBar(element, value, limit) {
+      const percent = Math.min(100, Math.abs(value) / limit * 50);
+      element.style.width = `${percent}%`;
+      element.classList.toggle("negative", value < 0);
+    }
+
+    function updateCsvControls() {
+      const total = csvRows.length;
+      elements.rowCounter.textContent = total ? `${csvIndex + 1} / ${total}` : "0 / 0";
+      elements.rowSlider.max = total ? String(total - 1) : "0";
+      elements.rowSlider.value = String(csvIndex);
+      elements.prevRow.disabled = total === 0 || csvIndex === 0;
+      elements.nextRow.disabled = total === 0 || csvIndex >= total - 1;
+      if (mode === "csv" && total > 0) {
+        const row = csvRows[csvIndex];
+        elements.rowNote.textContent = `frame ${row.frame_index || csvIndex}, status ${row.status || "UNKNOWN"}`;
+      } else if (total > 0) {
+        elements.rowNote.textContent = `${total} rows loaded`;
+      } else {
+        elements.rowNote.textContent = "No CSV loaded";
+      }
+    }
+
+    function formatNumber(value, digits) {
+      return Number.isFinite(value) ? value.toFixed(digits) : "None";
+    }
+
+    function setMode(nextMode) {
+      mode = nextMode;
+      elements.liveModeButton.setAttribute("aria-pressed", String(mode === "live"));
+      elements.manualModeButton.setAttribute("aria-pressed", String(mode === "manual"));
+      elements.csvModeButton.setAttribute("aria-pressed", String(mode === "csv"));
+      if (mode === "live") {
+        connectLive();
+      }
+      update();
+    }
+
+    function connectLive() {
+      if (window.location.protocol === "file:") {
+        liveError = "Dashboard must be served by apriltag_live_server.py for Live mode";
+        liveConnected = false;
+        updateLiveStatus();
+        return;
+      }
+      if (liveSource !== null) {
+        return;
+      }
+      liveSource = new EventSource("/events");
+      liveSource.addEventListener("open", () => {
+        liveConnected = true;
+        liveError = null;
+        update();
+      });
+      liveSource.addEventListener("observation", (event) => {
+        const payload = JSON.parse(event.data);
+        liveObservation = normalizeLiveObservation(payload);
+        liveConnected = true;
+        liveError = null;
+        lastLiveAtMs = Date.now();
+        mode = "live";
+        elements.liveModeButton.setAttribute("aria-pressed", "true");
+        elements.manualModeButton.setAttribute("aria-pressed", "false");
+        elements.csvModeButton.setAttribute("aria-pressed", "false");
+        update();
+      });
+      liveSource.addEventListener("hello", (event) => {
+        const payload = JSON.parse(event.data);
+        if (payload.observation) {
+          liveObservation = normalizeLiveObservation(payload.observation);
+          lastLiveAtMs = Date.now();
+        }
+        liveError = payload.camera_error || null;
+        update();
+      });
+      liveSource.addEventListener("heartbeat", (event) => {
+        const payload = JSON.parse(event.data);
+        liveError = payload.camera_error || null;
+        updateLiveStatus();
+      });
+      liveSource.addEventListener("error", () => {
+        liveConnected = false;
+        liveError = "Live event stream disconnected";
+        update();
+      });
+    }
+
+    function normalizeLiveObservation(payload) {
+      return {
+        timestamp_s: finiteNumber(payload.timestamp_s),
+        target_visible: asBoolean(payload.target_visible),
+        target_offset_x_m: finiteNumber(payload.target_offset_x_m),
+        target_offset_y_m: finiteNumber(payload.target_offset_y_m),
+        yaw_error_deg: finiteNumber(payload.yaw_error_deg),
+        range_m: finiteNumber(payload.range_m),
+        range_valid: asBoolean(payload.range_valid),
+        pose_valid: asBoolean(payload.pose_valid),
+        calibrated: asBoolean(payload.calibrated),
+        status: payload.status || "UNKNOWN",
+        frame_index: finiteNumber(payload.frame_index)
+      };
+    }
+
+    function parseCsv(text) {
+      const rows = [];
+      let current = "";
+      let row = [];
+      let quoted = false;
+      for (let index = 0; index < text.length; index += 1) {
+        const char = text[index];
+        const next = text[index + 1];
+        if (char === '"' && quoted && next === '"') {
+          current += '"';
+          index += 1;
+        } else if (char === '"') {
+          quoted = !quoted;
+        } else if (char === "," && !quoted) {
+          row.push(current);
+          current = "";
+        } else if ((char === "\n" || char === "\r") && !quoted) {
+          if (char === "\r" && next === "\n") {
+            index += 1;
+          }
+          row.push(current);
+          if (row.some((cell) => cell.length > 0)) {
+            rows.push(row);
+          }
+          row = [];
+          current = "";
+        } else {
+          current += char;
+        }
+      }
+      row.push(current);
+      if (row.some((cell) => cell.length > 0)) {
+        rows.push(row);
+      }
+      if (rows.length < 2) {
+        return [];
+      }
+      const headers = rows[0].map((cell) => cell.trim());
+      return rows.slice(1).map((cells) => {
+        const object = {};
+        headers.forEach((header, index) => {
+          object[header] = cells[index] === undefined ? "" : cells[index].trim();
+        });
+        return object;
+      });
+    }
+
+    elements.liveModeButton.addEventListener("click", () => setMode("live"));
+    elements.manualModeButton.addEventListener("click", () => setMode("manual"));
+    elements.csvModeButton.addEventListener("click", () => setMode("csv"));
+    elements.demoButton.addEventListener("click", () => {
+      setMode("manual");
+      elements.inputX.value = "0.060";
+      elements.inputY.value = "-0.035";
+      elements.inputYaw.value = "8.0";
+      elements.inputRange.value = "0.50";
+      elements.inputVisible.checked = true;
+      elements.inputPoseValid.checked = false;
+      elements.inputRangeValid.checked = false;
+      elements.inputCalibrated.checked = false;
+      update();
+    });
+
+    elements.csvFile.addEventListener("change", async (event) => {
+      const file = event.target.files[0];
+      if (!file) {
+        return;
+      }
+      const text = await file.text();
+      csvRows = parseCsv(text);
+      csvIndex = Math.max(0, csvRows.length - 1);
+      setMode("csv");
+    });
+
+    elements.prevRow.addEventListener("click", () => {
+      csvIndex = Math.max(0, csvIndex - 1);
+      update();
+    });
+
+    elements.nextRow.addEventListener("click", () => {
+      csvIndex = Math.min(csvRows.length - 1, csvIndex + 1);
+      update();
+    });
+
+    elements.rowSlider.addEventListener("input", () => {
+      csvIndex = Number(elements.rowSlider.value);
+      update();
+    });
+
+    [
+      elements.inputX,
+      elements.inputY,
+      elements.inputYaw,
+      elements.inputRange,
+      elements.inputVisible,
+      elements.inputPoseValid,
+      elements.inputRangeValid,
+      elements.inputCalibrated
+    ].forEach((input) => input.addEventListener("input", () => {
+      setMode("manual");
+      update();
+    }));
+
+    if (window.location.protocol !== "file:") {
+      setMode("live");
+    }
+
+    window.setInterval(() => {
+      if (mode === "live") {
+        updateLiveStatus();
+      }
+    }, 500);
+
+    update();
+  </script>
+</body>
+</html>

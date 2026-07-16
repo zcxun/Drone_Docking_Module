@@ -49,3 +49,14 @@ Pixhawk 6C 適合這個 demo，因為它提供：
 5. `lift test`：只有雙感測鎖定後，才允許 10-30 cm 起吊測試。
 
 每個里程碑都要能獨立 abort。
+
+## Jetson Bench Motor Test
+
+Jetson 與 Pixhawk 的第一個 powered hardware 練習只允許做無槳 bench motor test。實作與流程放在 `docs/10_jetson_pixhawk_mavlink_motor_test.md`。
+
+限制：
+
+- 只用 `MAV_CMD_DO_MOTOR_TEST`。
+- 不自動 arm、不 force arm、不切換飛行模式。
+- 每次只測一顆馬達，低油門、短時間。
+- 必須先完成只讀 heartbeat/telemetry monitor。

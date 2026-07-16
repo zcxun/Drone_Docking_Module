@@ -5,7 +5,7 @@
 | 子系統 | 責任 | 第一版實作 |
 | --- | --- | --- |
 | Pixhawk 6C / ArduPilot | 穩定飛行、模式切換、遙控器 failsafe、伺服/PWM 輸出 | 保持飛行控制核心，不放客製視覺邏輯 |
-| 伴隨電腦 | 影像辨識、目標偏移估計、對接狀態機、MAVLink 指令 | Raspberry Pi 5 或 Jetson Orin Nano |
+| 伴隨電腦 | 影像辨識、目標偏移估計、ToF range gate、對接狀態機、advisory 命令 | Raspberry Pi 5 或 Jetson Orin Nano；第一版 Jetson 不直接送 MAVLink |
 | 連接器機構 | 導正、緩衝、鎖定、釋放 | 3D 列印導正件 + 伺服插銷或機械卡扣 |
 | 感測節點 | 接觸、定位、鎖定訊號彙整 | ESP32/Arduino 或直接 GPIO |
 | 地面端 | 參數設定、遙測、測試紀錄、人工中止 | Mission Planner / MAVProxy / QGroundControl 擇一 |
@@ -47,6 +47,8 @@
 
 第一版鎖定判定必須同時滿足 `lock_switch_closed=true` 與 `hall_locked=true`。
 
+Jetson 末端對接版以 ToF/LiDAR 作為下降距離主來源，AprilTag range 只作交叉檢查。若 ToF invalid、過舊、超出範圍，或與 AprilTag calibrated range 差距過大，`range_valid=false`，狀態機不得進入或繼續下降。
+
 ## 控制輸出
 
 第一版軟體原型只輸出抽象命令：
@@ -58,3 +60,13 @@
 - 鎖扣命令：`OPEN_LOCK`、`CLOSE_LOCK`、`HOLD_LOCK`、`RELEASE_LOCK`。
 
 實機整合時，這些命令必須先經過 MAVLink bridge、模式限制、地面端 armed 狀態確認與飛手 override gate。
+
+## Jetson Runtime 邏輯
+
+第一版 Jetson runtime 分成三層：
+
+- `vision_node`：相機擷取與 AprilTag pose，輸出 `VisionObservation`。
+- `sensor_node`：彙整 ToF/LiDAR、ESP32 對接感測與 Pixhawk safety telemetry。
+- `supervisor_node`：做 stale/latency gate、ToF range gate、median/EMA filter，轉成 `SensorSnapshot` 後餵給 `DockingStateMachine`。
+
+輸出仍是 log-only / advisory `ControlCommand`。後續若要接 MAVLink，必須依 `docs/07_ardupilot_integration.md` 的 `log-only -> advisory -> guarded setpoint -> lock command -> lift test` 里程碑逐步放行。
