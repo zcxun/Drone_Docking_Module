@@ -1,11 +1,15 @@
 import math
 import unittest
 
-from software.companion.vision.apriltag_phone_pose import VisionObservation, VisionStatus
+from software.companion.vision.apriltag_phone_pose import VisionObservation, VisionStatus, _flatten_marker_ids
 from software.companion.vision.vision_to_sensor_snapshot import observation_to_sensor_snapshot
 
 
 class AprilTagOutputContractTest(unittest.TestCase):
+    def test_marker_ids_accept_opencv_column_or_flat_shapes(self):
+        self.assertEqual(_flatten_marker_ids([[0], [3]]), [0, 3])
+        self.assertEqual(_flatten_marker_ids([0, 3]), [0, 3])
+
     def test_calibrated_observation_maps_to_sensor_snapshot(self):
         observation = VisionObservation(
             timestamp_s=12.5,

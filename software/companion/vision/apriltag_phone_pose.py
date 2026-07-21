@@ -178,7 +178,7 @@ class AprilTagPhonePoseEstimator:
                 frame_height_px=frame_height,
             )
 
-        flat_ids = [int(marker_id[0]) for marker_id in ids]
+        flat_ids = _flatten_marker_ids(ids)
         if self.target_tag_id not in flat_ids:
             return VisionObservation.empty(
                 timestamp,
@@ -509,6 +509,21 @@ def _require_cv2() -> Any:
     if not hasattr(cv2, "aruco") or not hasattr(cv2.aruco, "ArucoDetector"):
         raise RuntimeError("OpenCV aruco support is required. Install opencv-contrib-python, not opencv-python.")
     return cv2
+
+
+def _flatten_marker_ids(ids: Any) -> list[int]:
+    """Normalize OpenCV ArUco id arrays across OpenCV builds."""
+
+    if hasattr(ids, "reshape"):
+        return [int(marker_id) for marker_id in ids.reshape(-1).tolist()]
+
+    flat_ids: list[int] = []
+    for marker_id in ids:
+        try:
+            flat_ids.append(int(marker_id[0]))
+        except (IndexError, TypeError):
+            flat_ids.append(int(marker_id))
+    return flat_ids
 
 
 def _np_array(values: Iterable[Any]) -> Any:
