@@ -21,6 +21,7 @@ The first milestone is intentionally conservative:
 - `docs/07_ardupilot_integration.md` - ArduPilot/Pixhawk 6C integration notes.
 - `docs/09_jetson_terminal_docking_runtime.md` - Jetson log-only/advisory runtime design.
 - `docs/10_jetson_pixhawk_mavlink_motor_test.md` - Jetson/Pixhawk MAVLink and no-prop motor-test procedure.
+- `docs/11_jetson_usb_camera_guidance_dashboard.md` - Jetson USB camera guidance dashboard procedure.
 - `.agents/` - project manager and engineering agent role definitions.
 - `hardware/connector_test_fixture.md` - tabletop fixture requirements.
 - `templates/experiment_log.csv` - per-test logging template.
